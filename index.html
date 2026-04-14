@@ -2,65 +2,132 @@
 <html lang="id">
 <head>
     <meta charset="UTF-8">
-    <title>EDC TIDAK ADA TRANSAKSI</title>
+    <title>LAPORAN EDC TRANSAKSI - LEBAK G157</title>
     <script src="https://cdn.sheetjs.com/xlsx-0.19.3/package/dist/xlsx.full.min.js"></script>
     <style>
-        body { font-family: 'Segoe UI', sans-serif; margin: 20px; background-color: #f4f7f6; }
-        .container { max-width: 100%; background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); overflow-x: auto; }
-        h2 { color: #1a73e8; border-bottom: 2px solid #1a73e8; padding-bottom: 8px; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 20px; background-color: #f0f2f5; color: #333; }
+        .container { max-width: 100%; background: white; padding: 30px; border-radius: 15px; box-shadow: 0 8px 30px rgba(0,0,0,0.1); overflow-x: auto; }
+        h2 { color: #1a73e8; border-bottom: 3px solid #1a73e8; padding-bottom: 10px; margin-top: 0; }
         
-        .upload-section { background: #e8f0fe; padding: 20px; border-radius: 8px; border: 2px dashed #1a73e8; text-align: center; margin-bottom: 20px; }
-        .btn-export { background: #27ae60; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; font-weight: bold; display: none; margin-bottom: 15px;}
+        /* Layout Input */
+        .upload-section { background: #f8fbff; padding: 25px; border-radius: 12px; border: 2px dashed #1a73e8; margin-bottom: 25px; }
+        .input-grid { display: flex; gap: 30px; justify-content: center; flex-wrap: wrap; margin-bottom: 20px; }
+        .input-group { flex: 1; min-width: 250px; padding: 15px; background: white; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+        .input-group p { margin-top: 0; font-weight: bold; color: #1a73e8; }
         
-        table { width: 100%; border-collapse: collapse; margin-top: 10px; background: white; }
-        th, td { border: 1px solid #ccc; padding: 6px 4px; text-align: center; font-size: 11px; white-space: nowrap; }
-        th { background: #2c3e50; color: white; }
-        .toko-col { text-align: left; font-weight: bold; background: #f8f9fa; position: sticky; left: 0; z-index: 5; }
+        /* Buttons */
+        .btn-container { text-align: center; display: flex; gap: 10px; justify-content: center; }
+        .btn { padding: 12px 25px; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; transition: 0.3s; }
+        #prosesBtn { background: #1a73e8; color: white; }
+        #prosesBtn:hover { background: #1557b0; }
+        .btn-export { background: #27ae60; color: white; display: none; }
+        .btn-export:hover { background: #1e8449; }
+
+        /* Table Style */
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; background: white; font-size: 11px; }
+        th, td { border: 1px solid #dee2e6; padding: 8px 5px; text-align: center; white-space: nowrap; }
+        th { background: #2c3e50; color: white; position: sticky; top: 0; }
+        .toko-col { text-align: left; font-weight: bold; background: #f8f9fa; position: sticky; left: 0; z-index: 5; border-right: 2px solid #1a73e8; }
         .bca-head { background: #2ecc71; color: white; }
         .wide-head { background: #f39c12; color: white; }
         .zero { color: #e74c3c; font-weight: bold; background-color: #fff5f5; }
         .has-val { font-weight: bold; color: #2ecc71; }
+
+        /* Overlay Loading */
+        #overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 10000; color: white; text-align: center; padding-top: 20vh; }
+        .spinner { border: 6px solid #f3f3f3; border-top: 6px solid #3498db; border-radius: 50%; width: 50px; height: 50px; animation: spin 1s linear infinite; margin: 20px auto; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
     </style>
 </head>
 <body>
+
+<div id="overlay">
+    <div class="spinner"></div>
+    <h3>Sedang Memproses Data...</h3>
+</div>
 
 <div class="container">
     <h2>LAPORAN TRANSAKSI EDC</h2>
     
     <div class="upload-section">
-        <p>Upload CSV untuk memproses data dan menggabungkan status tanggal</p>
-        <input type="file" id="fileInput" accept=".csv">
-        <button id="exportBtn" class="btn-export" onclick="exportToExcel()">💾 Download Rekap .XLSX</button>
+        <div class="input-grid">
+            <div class="input-group">
+                <p>1. Update Master Toko (Opsional)</p>
+                <input type="file" id="masterInput" accept=".txt,.csv">
+                <small style="color: #888; display: block; margin-top: 5px;">Upload .txt berisi kode toko per baris</small>
+            </div>
+            <div class="input-group">
+                <p>2. Upload CSV Dari IGFS</p>
+                <input type="file" id="fileInput" accept=".csv">
+                <small style="color: #888; display: block; margin-top: 5px;">Gunakan file Type DEB & CCR</small>
+            </div>
+        </div>
+        
+        <div class="btn-container">
+            <button id="prosesBtn" class="btn" onclick="jalankanProses()">⚡ JALANKAN PROSES</button>
+            <button id="exportBtn" class="btn btn-export" onclick="exportToExcel()">💾 DOWNLOAD REKAP (.XLSX)</button>
+        </div>
     </div>
 
     <div id="tableWrapper"></div>
 </div>
 
 <script>
-    // Master Data Toko
-    const masterToko = ["TF5R", "F8E2", "T1PM", "T8BS", "TCTD", "TL83", "TOCA", "F33M", "T3CV", "FUN8", "F1XC", "F5Y0", "THUT", "TQA7", "FE0T", "TQ6X", "TG5K", "TU6P", "FVSB", "T2BL", "F8CH", "TTXR", "THVP", "TTH7", "T0QM", "TM9S", "T6KN", "TZKS", "FAGD", "T5YT", "TMAW", "T4FD", "TEQ6", "TOGL", "TY7A", "TZJM", "TBWA", "TO7W", "TPCT", "T2ET", "FP7U", "TQH8", "TX0T", "T7B4", "TV2Y", "TY3K", "T2EC", "F778", "TF5W", "TVW5", "TZZK", "TBBD", "TT9X", "F32F", "F53Y", "TKMH", "T2ZV", "F33R", "T6ED", "TR2M", "TUKG", "TCUD", "TBXX", "FXGX", "F1GY", "T2LX", "F3FB", "TTWF", "T0E7", "TWED", "FDGS", "T64C", "TI92", "TOA5", "TVR9", "F7P1", "FKP5", "F1RF", "TBHP", "TXF2", "TTBQ", "TZEX", "TOCY", "TIF6", "TYEJ", "T36E", "T1EC", "T8VN", "TN23", "TWWB", "TES4", "T23T", "T0L7", "TJZ5", "TDZJ", "F58A", "TP2C", "T8VR", "TN8S", "TKE3", "TPBY", "F0CD", "T42Q", "FZ4Y", "TJP6", "F3TF", "TPVS", "TV37", "T7X8", "T182", "TPSN", "FTE5", "TPEJ", "FVLJ", "TIG9", "TP8C", "TIKX", "TLM1", "FC8L", "T8SF", "TMVQ", "TUO3", "TVBG", "T04M", "FZ29", "TSGE", "T1DO", "TD4N", "TIM4", "TGDA", "TDDD", "TS7R", "F59A", "FO2Y", "FVM5", "F00E", "FSE6", "T3YO", "TFT1", "TJCT", "TOUA", "T9B3", "TKD8", "THAQ", "TPWC", "TZ4V", "F85A", "TMS7", "TP2G", "FRS9", "T9N2", "TOX0", "TPXI", "T86N", "F2XT", "T50E", "TEMB", "T1Y1", "T3B5", "TK7B", "T83I", "FHV8", "TSQ2", "T74E", "TRC5", "TXTL", "F124", "F776", "T7OD", "T90Y", "T42A", "FFJW", "TACW", "TYWC", "T51E", "TINP", "TY4V", "TLET", "THJC", "T28E", "FVO0", "TAID", "TPM0", "TZC8", "TWI3", "TU8F", "TEQ9", "TUNJ", "FK1N", "TGWZ", "TB7O", "TT3R", "TPC7", "TBW7", "T3LX", "T67N", "TQOY", "FXYS", "T14E", "FHVG", "TBGR", "TLUQ", "TOSI", "T5CW", "FR90", "THGZ", "TFB2", "FT07", "TIX8", "T0A8", "FTHF", "T5PW", "T5XA", "TP49", "F8RT", "FCD3", "TNEU", "TYX0", "TNCV", "F150", "TNDN", "T8ET", "TW9S", "T18Q", "T19E", "TLI2", "T4SY", "TS0X", "TP1E", "TIXP", "TRS1", "T0UK", "TY2P", "T4PH", "TIGT", "TVQT", "TSLC", "F940", "TCRJ", "TWK2", "T13J", "TEIR", "T9K4", "T86M", "TO6F", "TPY6", "T9Q2", "TTOI", "T0LW", "T4HY", "FGHY", "TLI7", "TFM1", "TGWS", "FQJR", "TPOQ", "F554", "FMLX", "FTLM", "TATD", "TGC4", "F1X9", "FG8H", "FGPK", "FU0K", "TJNU", "T5KJ", "FDXU", "F0QY", "T229", "TJAN", "TJD0", "FQ4Z", "TG5O", "TNS5", "TGLC", "T1Q5", "TBS8", "TFZ9", "TZ1T", "FHTZ", "TW3R", "FJY8", "TP84", "TXJ3", "FK3V", "FHO6", "TFJT", "TVUC", "F8MM", "FYG3", "TGPJ", "F5QY", "F7FS", "FCJ4", "FQ1F", "FTNQ", "TQE8", "TSBG", "TTGD", "TXV2", "TY40", "TY96", "TX8K", "T6X9", "F0NX", "FIUK", "TKMQ", "TS8O", "TCGY", "T1XA", "T1NO", "TLFJ", "T6M0", "TPMG", "TOLY", "FAP5", "THLV", "TD1I", "T15D", "TEFP", "T42E", "F0K7", "FIDS", "FO1K", "FUPC", "T6XT", "TOML", "TZJH", "FMGK", "T0HX", "TCI8", "FZY5", "T0H9", "T23E", "T567", "T5UM", "TCL9", "TFAI", "TJ8B", "TQBE", "TVYK", "TD04", "T8UF", "TJUE", "TCZ7", "TFHX", "T40I", "F280", "TCL6", "FGML", "FXHI", "FSMU", "T5O6", "TWFI", "T8GD", "FLKZ", "FXF6", "TO7I", "TJFT", "TSUH", "TVCU", "T25T", "F9JU", "T0K8", "TYQ0", "TDP2", "T7LY", "T2UB", "F117", "TEEC", "TY5K", "TLUI", "TRIS", "T0P6", "TV6G", "TC3J", "TB8A", "TE8V", "TM3Q", "T9V2", "T4IB", "TLWZ", "TAMS", "FNMH", "TUDI", "FQT4", "TWII", "TC7E", "TY29", "TOCJ", "THC9", "TIK8", "F68U", "TEIC", "T92P", "TCUT", "TSS6", "TVXD", "TQG0", "F392", "T86W", "TJM4", "T6CD", "FL3K", "TU7D", "TT51", "FDJI", "FXXV", "TZ0N", "FEWW", "F2B1", "FFP0", "TDFN", "TMMT", "F68G", "F6TD", "FYBL", "F3KO", "TQI5", "T778", "F8HI", "TJCK", "F6PS", "T7AV", "FEBE", "TUFN", "TD05", "FX7U", "TY33", "TE3B", "FY9K", "T25I", "TS87", "F3GG", "F7BG", "TK27", "T9F5", "TGS0", "TCBJ", "TPQT", "FI9D", "TKJB", "TVTS", "TD6I", "TRAE", "T7QX", "FLEO", "TP8A", "TAVZ", "FPAC", "TCEH", "TSAO", "FQNX", "FSSW", "TKV7", "TI9Q", "TZJ9", "FM19", "FO35", "FZ9R", "TBQF", "F98Q", "FVSU", "TGXH", "T4EB", "F57V", "T8WF", "TN4W", "TGOW", "TK1C", "FDCT", "TEB7", "TUBI", "T2O1", "TV3M", "TIAJ", "TTSM", "THVC", "T19D", "TX8D", "T0CF", "T9DK", "T2I9", "TFDQ", "TRRH", "TMMS", "TCNF", "TKBV", "T21M", "T6QN", "T61A", "TWDW", "TFS4", "T9ZR", "T05E", "T65O", "TI4J", "T5VC", "T6W3", "FBO0", "TZKP", "TY8Q", "TFWM", "TRW8", "T2AF", "TIM1", "THXK", "TQC6", "T6P8", "TNS1", "FY3D", "TPSL", "TEZX", "TFUH", "TYK4", "F03F", "TPZZ", "FZZV", "F4MA", "FXVP", "FF4K", "TT0A", "TW23", "F17B", "T0LJ", "TDB3", "FDYO", "THPS", "TQ0L", "TBUK", "T7Y0", "FLWP", "T2SM", "FOSH", "FSGL", "TCAE", "TPF2", "T8UT", "TAVE", "TE2I", "F04F", "TOOC", "FEZK", "TPRH", "TI4Y", "FASZ", "TKX7", "T404", "T33O", "FYEJ", "TGWY", "TGRB", "T96C", "TKB0", "TY0W", "TA0U", "TZWV", "F0SE", "TPZ3", "TT9A", "FQOR", "TTJE", "TG2T", "F0B8", "T2YR", "TLDG", "TNM0", "T1I9", "FMPG", "TNHX", "TQYB", "TOBD", "FQ4X", "FL74", "T8JM", "FAL1", "TXZO", "TJNT", "TNEW", "T1I8", "TMWK", "T1E7", "FA72", "TUZR", "TVWS", "TQUC", "F6M6", "T9GR", "T1CE", "TCYU", "F2R9", "F83N", "F39A", "TDJO", "TA1T", "TVWV", "TP74", "TV5B", "FMIM", "TYLU", "FKHM", "TSTH", "T8SA", "TKJ2", "F8L8", "TRR7", "F597"];
+    // Variabel let agar bisa di-update 
+    let masterToko = ["TF5R", "F8E2", "T1PM", "T8BS", "TCTD", "TL83", "TOCA", "F33M", "T3CV", "FUN8", "F1XC", "F5Y0", "THUT", "TQA7", "FE0T", "TQ6X", "TG5K"]; 
 
     let processedDates = [];
     let matrixData = {};
+    let rawCsvText = "";
 
     document.getElementById('fileInput').addEventListener('change', function(e) {
         const file = e.target.files[0];
-        if (!file) return;
-        const reader = new FileReader();
-        reader.onload = e => processData(e.target.result);
-        reader.readAsText(file);
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = (ev) => { rawCsvText = ev.target.result; };
+            reader.readAsText(file);
+        }
     });
+
+    async function jalankanProses() {
+        if (!rawCsvText) {
+            alert("Harap pilih file CSV Transaksi terlebih dahulu!");
+            return;
+        }
+
+        document.getElementById('overlay').style.display = 'block';
+
+        // Beri jeda sedikit agar overlay muncul sebelum script berat berjalan
+        setTimeout(async () => {
+            try {
+                const masterFile = document.getElementById('masterInput').files[0];
+                if (masterFile) {
+                    const text = await masterFile.text();
+                    // Update masterToko dari file .txt 
+                    masterToko = text.split(/\r?\n/).map(t => t.trim()).filter(t => t !== "");
+                }
+
+                processData(rawCsvText);
+                renderHorizontalTable();
+                document.getElementById('exportBtn').style.display = 'inline-block';
+            } catch (err) {
+                alert("Gagal memproses file. Pastikan format benar.");
+            } finally {
+                document.getElementById('overlay').style.display = 'none';
+            }
+        }, 100);
+    }
 
     function processData(text) {
         const lines = text.split('\n');
-        const dataRows = lines.slice(7);
+        const dataRows = lines.slice(7); // IGFS header skip [cite: 68]
         let datesSet = new Set();
         let stats = {}; 
 
         dataRows.forEach(line => {
             const cols = line.split('|');
             if (cols.length > 10) {
-                const tgl = cols[6].trim().replace(/"/g, '');
+                const tgl = cols[6].trim().replace(/"/g, ''); 
                 const kodeToko = cols[2].trim().replace(/"/g, '').split('-')[0];
                 const bank = cols[10].trim().replace(/"/g, '');
 
@@ -77,10 +144,7 @@
             const pA = a.split('-'); const pB = b.split('-');
             return new Date(pA[2], pA[1]-1, pA[0]) - new Date(pB[2], pB[1]-1, pB[0]);
         });
-        
         matrixData = stats;
-        renderHorizontalTable();
-        document.getElementById('exportBtn').style.display = 'inline-block';
     }
 
     function renderHorizontalTable() {
@@ -93,85 +157,63 @@
 
         masterToko.forEach((kode, idx) => {
             let rowHtml = `<tr><td>${idx+1}</td><td class="toko-col">${kode}</td>`;
-            let storeTotalBca = 0, storeTotalWide = 0;
+            let tB = 0, tW = 0;
             processedDates.forEach(tgl => {
                 const d = (matrixData[kode] && matrixData[kode][tgl]) ? matrixData[kode][tgl] : { bca: 0, wide: 0 };
-                storeTotalBca += d.bca; storeTotalWide += d.wide;
+                tB += d.bca; tW += d.wide;
                 rowHtml += `<td class="${d.bca > 0 ? 'has-val' : 'zero'}">${d.bca}</td>`;
                 rowHtml += `<td class="${d.wide > 0 ? 'has-val' : 'zero'}">${d.wide}</td>`;
             });
-            rowHtml += `<td style="background:#e8fdf0; font-weight:bold">${storeTotalBca}</td>`;
-            rowHtml += `<td style="background:#fff9e8; font-weight:bold">${storeTotalWide}</td></tr>`;
+            rowHtml += `<td style="background:#e8fdf0; font-weight:bold">${tB}</td>`;
+            rowHtml += `<td style="background:#fff9e8; font-weight:bold">${tW}</td></tr>`;
             html += rowHtml;
         });
+
         html += `</tbody></table>`;
         wrapper.innerHTML = html;
     }
 
     function exportToExcel() {
-    const wb = XLSX.utils.book_new();
-    const totalHariCSV = processedDates.length;
-    const limit = Math.ceil(totalHariCSV * 0.5); // Minimal 50% bolong
+        const wb = XLSX.utils.book_new();
+        const limit = Math.ceil(processedDates.length * 0.5); // 50% bolong [cite: 80, 81]
 
-    // --- Sheet 1: Data All (Tetap Sama) ---
-    let sheet1Data = [];
-    masterToko.forEach((kode, idx) => {
-        let row = { "No": idx+1, "Kode Toko": kode };
-        let tB = 0, tW = 0;
-        processedDates.forEach(tgl => {
-            const d = (matrixData[kode] && matrixData[kode][tgl]) ? matrixData[kode][tgl] : { bca: 0, wide: 0 };
-            row[`BCA (${tgl})`] = d.bca;
-            row[`WIDE (${tgl})`] = d.wide;
-            tB += d.bca; tW += d.wide;
-        });
-        row["Grand Total BCA"] = tB;
-        row["Grand Total WIDE"] = tW;
-        sheet1Data.push(row);
-    });
-
-    // --- Sheet 2: Rekap Prioritas (Logika Baru) ---
-    let sheet2Data = [];
-    masterToko.forEach((kode) => {
-        let bcaZeroDates = [];
-        let wideZeroDates = [];
-
-        processedDates.forEach(tgl => {
-            const d = (matrixData[kode] && matrixData[kode][tgl]) ? matrixData[kode][tgl] : { bca: 0, wide: 0 };
-            const day = tgl.split('-')[0];
-            if (d.bca === 0) bcaZeroDates.push(day);
-            if (d.wide === 0) wideZeroDates.push(day);
-        });
-
-        // Filter: Hanya proses jika salah satu (atau keduanya) bolong >= 50%
-        let isBcaIssue = bcaZeroDates.length >= limit;
-        let isWideIssue = wideZeroDates.length >= limit;
-
-        if (isBcaIssue || isWideIssue) {
-            let detailStatus = [];
-            let periodeTampil = [];
-
-            if (isBcaIssue) {
-                detailStatus.push(`BCA (${bcaZeroDates.join(',')})`);
-                periodeTampil.push(`${bcaZeroDates.length} Hari BCA`);
-            }
-            if (isWideIssue) {
-                detailStatus.push(`WIDE/MTI (${wideZeroDates.join(',')})`);
-                periodeTampil.push(`${wideZeroDates.length} Hari WIDE`);
-            }
-
-            sheet2Data.push({
-                "Kode Toko": kode,
-                "Periode Masalah": periodeTampil.join(' & '),
-                "Keterangan": "Tidak Ada Transaksi " + detailStatus.join(' dan ') + " Maret 2026"
+        let sheet1Data = [];
+        masterToko.forEach((kode, idx) => {
+            let row = { "No": idx+1, "Kode Toko": kode };
+            let tb = 0, tw = 0;
+            processedDates.forEach(tgl => {
+                const d = (matrixData[kode] && matrixData[kode][tgl]) ? matrixData[kode][tgl] : { bca: 0, wide: 0 };
+                row[`BCA (${tgl})`] = d.bca;
+                row[`WIDE (${tgl})`] = d.wide;
+                tb += d.bca; tw += d.wide;
             });
-        }
-    });
+            row["Total BCA"] = tb; row["Total WIDE"] = tw;
+            sheet1Data.push(row);
+        });
 
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(sheet1Data), "Data All");
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(sheet2Data), "Prioritas Cek");
-    XLSX.writeFile(wb, `Rekap_EDC_Prioritas_Final.xlsx`);
-}
+        let sheet2Data = [];
+        masterToko.forEach(kode => {
+            let bZ = [], wZ = [];
+            processedDates.forEach(tgl => {
+                const d = (matrixData[kode] && matrixData[kode][tgl]) ? matrixData[kode][tgl] : { bca: 0, wide: 0 };
+                const day = tgl.split('-')[0];
+                if (d.bca === 0) bZ.push(day);
+                if (d.wide === 0) wZ.push(day);
+            });
+
+            if (bZ.length >= limit || wZ.length >= limit) {
+                sheet2Data.push({
+                    "Kode Toko": kode,
+                    "Masalah": `${bZ.length >= limit ? 'BCA ('+bZ.length+' hari)' : ''} ${wZ.length >= limit ? 'WIDE ('+wZ.length+' hari)' : ''}`,
+                    "Keterangan": `BCA Kosong Tgl: ${bZ.join(',')} | WIDE Kosong Tgl: ${wZ.join(',')}`
+                });
+            }
+        });
+
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(sheet1Data), "Data All");
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(sheet2Data), "Prioritas Cek");
+        XLSX.writeFile(wb, `Rekap_EDC_Final.xlsx`);
+    }
 </script>
-
 </body>
 </html>
